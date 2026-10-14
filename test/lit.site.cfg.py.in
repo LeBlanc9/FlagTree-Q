@@ -1,0 +1,8 @@
+@LIT_SITE_CFG_IN_HEADER@
+
+config.flagtree_q_source_dir = r"@PROJECT_SOURCE_DIR@"
+config.flagtree_q_binary_dir = r"@PROJECT_BINARY_DIR@"
+config.flagtree_q_tools_dir = r"@LLVM_RUNTIME_OUTPUT_INTDIR@"
+config.filecheck = r"@FLAGTREE_Q_FILECHECK@"
+
+lit_config.load_config(config, r"@PROJECT_SOURCE_DIR@/test/lit.cfg.py")

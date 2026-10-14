@@ -1,0 +1,20 @@
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "flagtree-q"
+version = "0.1.0"
+description = "MLIR-based quantum compiler infrastructure for FlagTree-Q"
+readme = "README.md"
+requires-python = ">=3.9"
+dependencies = []
+
+[project.scripts]
+flagtree-q = "flagtree_q.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["python"]
+
+[tool.setuptools.package-data]
+flagtree_q = ["py.typed"]

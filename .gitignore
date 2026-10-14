@@ -1,0 +1,11 @@
+/build*/
+/install/
+/dist/
+/.venv/
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+.DS_Store
+/CMakeUserPresets.json
+/compile_commands.json
