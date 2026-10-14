@@ -7,6 +7,7 @@ target_link_libraries(flagtree-q-opt PRIVATE
   MLIRMathDialect
   MLIRSCFDialect
   MLIROptLib
+  MLIRTransforms
 )
 mlir_check_all_link_libraries(flagtree-q-opt)
 

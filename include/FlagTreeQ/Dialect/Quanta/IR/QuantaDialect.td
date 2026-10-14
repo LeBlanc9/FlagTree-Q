@@ -8,9 +8,15 @@ def Quanta_Dialect : Dialect {
   let cppNamespace = "::flagtreeq::quanta";
   let summary = "Quantum program representation for FlagTree-Q";
   let description = [{
-    Quanta will represent quantum values and operations alongside MLIR's
-    classical dialects. This initial skeleton registers the dialect only;
-    quantum types, operations, and their semantics are not implemented yet.
+    Quanta represents quantum programs alongside MLIR's classical dialects.
+    It provides single-qubit references and unitary gates with optional
+    quantum controls and adjoint modifiers, plus allocation, Z measurement,
+    reset, and explicit deallocation. Linear quantum value types will be
+    introduced separately.
+  }];
+  let useDefaultTypePrinterParser = 1;
+  let extraClassDeclaration = [{
+    void registerTypes();
   }];
 }
 
