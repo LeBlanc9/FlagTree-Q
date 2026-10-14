@@ -29,6 +29,11 @@ add_subdirectory(include)
 add_subdirectory(lib)
 add_subdirectory(tools)
 
+option(FLAGTREE_Q_BUILD_PYTHON_MODULE "Build FlagTree-Q's native Python extension" OFF)
+if(FLAGTREE_Q_BUILD_PYTHON_MODULE)
+  add_subdirectory(python/src)
+endif()
+
 option(FLAGTREE_Q_BUILD_TESTS "Build FlagTree-Q regression tests" ON)
 if(FLAGTREE_Q_BUILD_TESTS)
   enable_testing()

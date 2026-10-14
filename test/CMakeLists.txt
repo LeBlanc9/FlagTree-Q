@@ -26,6 +26,7 @@ set(FLAGTREE_Q_PYTHON_TEST_COMMAND
   "${CMAKE_COMMAND}" -E env
   "PYTHONPATH=${PROJECT_SOURCE_DIR}/python"
   "FLAGTREE_Q_OPT=$<TARGET_FILE:flagtree-q-opt>"
+  "FLAGTREE_Q_TEST_BINDINGS=$<BOOL:${FLAGTREE_Q_BUILD_PYTHON_MODULE}>"
   "${Python3_EXECUTABLE}" -m unittest discover
   -s "${CMAKE_CURRENT_SOURCE_DIR}/python" -v
 )
@@ -35,6 +36,9 @@ add_custom_target(check-flagtree-q-python
   DEPENDS flagtree-q-opt
   USES_TERMINAL
 )
+if(FLAGTREE_Q_BUILD_PYTHON_MODULE)
+  add_dependencies(check-flagtree-q-python libflagtree_q)
+endif()
 add_custom_target(check-flagtree-q
   DEPENDS check-flagtree-q-lit check-flagtree-q-python
 )

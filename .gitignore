@@ -10,3 +10,5 @@ __pycache__/
 .DS_Store
 /CMakeUserPresets.json
 /compile_commands.json
+/python/flagtree_q/_C/*.so
+/python/flagtree_q/_C/*.pyd

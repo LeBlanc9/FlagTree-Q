@@ -1,0 +1,8 @@
+include CMakeLists.txt
+recursive-include cmake *.txt *.cmake
+recursive-include include *.h *.td CMakeLists.txt
+recursive-include lib *.cpp CMakeLists.txt
+recursive-include tools *.cpp CMakeLists.txt
+recursive-include python/src *.cpp CMakeLists.txt
+recursive-include test *.py *.in *.mlir CMakeLists.txt
+recursive-include docs *.md
