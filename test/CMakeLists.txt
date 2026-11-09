@@ -16,7 +16,7 @@ configure_lit_site_cfg(
 
 add_lit_testsuite(check-flagtree-q-lit "Running FlagTree-Q MLIR tests"
   "${CMAKE_CURRENT_BINARY_DIR}"
-  DEPENDS flagtree-q-opt
+  DEPENDS flagtree-q-opt flagtree-q-translate
 )
 add_test(NAME flagtree-q-lit
   COMMAND "${Python3_EXECUTABLE}" "${FLAGTREE_Q_LIT}" -sv "${CMAKE_CURRENT_BINARY_DIR}"
@@ -26,6 +26,7 @@ set(FLAGTREE_Q_PYTHON_TEST_COMMAND
   "${CMAKE_COMMAND}" -E env
   "PYTHONPATH=${PROJECT_SOURCE_DIR}/python"
   "FLAGTREE_Q_OPT=$<TARGET_FILE:flagtree-q-opt>"
+  "FLAGTREE_Q_TRANSLATE=$<TARGET_FILE:flagtree-q-translate>"
   "FLAGTREE_Q_TEST_BINDINGS=$<BOOL:${FLAGTREE_Q_BUILD_PYTHON_MODULE}>"
   "${Python3_EXECUTABLE}" -m unittest discover
   -s "${CMAKE_CURRENT_SOURCE_DIR}/python" -v
@@ -33,7 +34,7 @@ set(FLAGTREE_Q_PYTHON_TEST_COMMAND
 add_test(NAME flagtree-q-python COMMAND ${FLAGTREE_Q_PYTHON_TEST_COMMAND})
 add_custom_target(check-flagtree-q-python
   COMMAND ${FLAGTREE_Q_PYTHON_TEST_COMMAND}
-  DEPENDS flagtree-q-opt
+  DEPENDS flagtree-q-opt flagtree-q-translate
   USES_TERMINAL
 )
 if(FLAGTREE_Q_BUILD_PYTHON_MODULE)

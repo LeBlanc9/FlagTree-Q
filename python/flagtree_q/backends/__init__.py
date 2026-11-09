@@ -1,1 +1,1 @@
-"""Reserved for target integration, starting with FlagQuantum."""
+"""Optional execution adapters for compiled quantum programs."""

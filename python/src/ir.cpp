@@ -1,6 +1,8 @@
+#include "FlagTreeQ/Conversion/QuantaToQIR/Passes.h"
 #include "FlagTreeQ/Dialect/Quanta/IR/QuantaDialect.h"
 #include "FlagTreeQ/Dialect/Quanta/IR/QuantaOps.h"
 #include "FlagTreeQ/Dialect/Quanta/IR/QuantaTypes.h"
+#include "FlagTreeQ/Target/QIR/Export.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/IR/Builders.h"
@@ -8,6 +10,7 @@
 #include "mlir/IR/Diagnostics.h"
 #include "mlir/IR/SymbolTable.h"
 #include "mlir/IR/Verifier.h"
+#include "mlir/Pass/PassManager.h"
 #include "llvm/Support/raw_ostream.h"
 #include <pybind11/pybind11.h>
 #include <pybind11/stl.h>
@@ -54,6 +57,31 @@ struct Module {
     flags.enableDebugInfo(debugInfo);
     operation->print(stream, flags);
     return text;
+  }
+
+  std::string toQIR(bool bitcode = false) {
+    std::string output, diagnostics;
+    llvm::raw_string_ostream stream(output), errors(diagnostics);
+    mlir::ScopedDiagnosticHandler handler(
+        &owner->context, [&](mlir::Diagnostic &diagnostic) {
+          diagnostic.getLocation().print(errors);
+          errors << ": ";
+          diagnostic.print(errors);
+          errors << '\n';
+          return mlir::success();
+        });
+    // This convenience entry point owns the pipeline. Lower on a clone so
+    // Python's Function/Value handles keep referring to the original module.
+    mlir::OwningOpRef<mlir::ModuleOp> lowered =
+        mlir::cast<mlir::ModuleOp>(operation->clone());
+    mlir::PassManager manager(&owner->context);
+    manager.addPass(flagtreeq::createConvertQuantaToQIRPass());
+    if (mlir::failed(mlir::verify(*lowered)) ||
+        mlir::failed(manager.run(*lowered)) ||
+        mlir::failed(flagtreeq::qir::exportQIR(*lowered, stream, bitcode)))
+      throw std::invalid_argument(diagnostics.empty() ? "QIR export failed"
+                                                       : diagnostics);
+    return output;
   }
 };
 
@@ -303,6 +331,11 @@ void initIR(py::module_ &module) {
       .def(py::init<std::shared_ptr<Context>>(), py::arg("context").none(false))
       .def("__str__", [](Module &module) { return module.str(); })
       .def("to_string", &Module::str, py::arg("debug_info") = false)
+      .def("to_qir", [](Module &module) { return module.toQIR(); },
+           "Export a clone to QIR 2.0 Base Profile LLVM IR.")
+      .def("to_qir_bitcode", [](Module &module) {
+        return py::bytes(module.toQIR(true));
+      }, "Export a clone to QIR 2.0 Base Profile LLVM bitcode.")
       .def("verify", [](Module &module) {
         auto error = verificationError(*module.operation);
         if (!error.empty())

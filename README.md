@@ -1,3 +1,18 @@
 # FlagTree-Q
 
-FlagTree-Q 是基于 MLIR 的量子与经典混合程序编译项目，用于量子程序表示、编译优化与目标转换。
+FlagTree-Q 是基于 MLIR 的量子与经典混合程序编译项目。
+
+```python
+import flagtree_q as fq
+import flagtree_q.language as ql
+
+
+@fq.kernel
+def random_bit() -> bool:
+    q = ql.qubit()
+    ql.h(q)
+    return ql.measure(q)
+
+
+print(random_bit.compile())
+```

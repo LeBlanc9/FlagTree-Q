@@ -2,8 +2,10 @@ add_llvm_executable(flagtree-q-opt flagtree-q-opt.cpp)
 llvm_update_compile_flags(flagtree-q-opt)
 target_link_libraries(flagtree-q-opt PRIVATE
   FlagTreeQQuanta
+  FlagTreeQQuantaToQIR
   MLIRArithDialect
   MLIRFuncDialect
+  MLIRLLVMDialect
   MLIRMathDialect
   MLIRSCFDialect
   MLIROptLib

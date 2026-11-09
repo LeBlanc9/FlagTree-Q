@@ -18,7 +18,8 @@ set(LLVM_REQUIRES_RTTI ON)
 pybind11_add_module(libflagtree_q MODULE NO_EXTRAS main.cpp ir.cpp)
 llvm_update_compile_flags(libflagtree_q)
 target_link_libraries(libflagtree_q PRIVATE
-  FlagTreeQQuanta MLIRArithDialect MLIRFuncDialect MLIRIR MLIRSupport)
+  FlagTreeQQuanta FlagTreeQQuantaToQIR FlagTreeQQIRExport
+  MLIRArithDialect MLIRFuncDialect MLIRIR MLIRPass MLIRSupport)
 mlir_check_all_link_libraries(libflagtree_q)
 
 set(FLAGTREE_Q_PYTHON_OUTPUT_DIR "${PROJECT_SOURCE_DIR}/python/flagtree_q/_C"

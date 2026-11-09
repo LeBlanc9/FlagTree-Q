@@ -13,3 +13,6 @@ config.substitutions.append(
     ("%flagtree_q_opt", shlex.quote(os.path.join(config.flagtree_q_tools_dir, "flagtree-q-opt")))
 )
 config.substitutions.append(("%FileCheck", shlex.quote(config.filecheck)))
+config.substitutions.append(
+    ("%flagtree_q_translate", shlex.quote(os.path.join(config.flagtree_q_tools_dir, "flagtree-q-translate")))
+)

@@ -2,21 +2,28 @@
 
 ```text
 include/FlagTreeQ/Dialect/Quanta/IR/   # 公开头文件、TableGen 定义
-lib/Dialect/Quanta/IR/                # dialect 实现
-lib/Dialect/Quanta/Transforms/        # 量子分析与优化
-lib/Conversion/                      # 目标转换
-tools/flagtree-q-opt/                 # 原生 MLIR 工具
+include/FlagTreeQ/Conversion/         # lowering pass 接口
+include/FlagTreeQ/Target/QIR/         # QIR ABI 定义与导出接口
+lib/Dialect/Quanta/IR/               # dialect 实现
+lib/Conversion/QuantaToQIR/          # Quanta → LLVM dialect / QIR calls
+lib/Target/QIR/                     # QIR ABI 与最终格式导出
+tools/flagtree-q-opt/                # 原生 MLIR 工具
+tools/flagtree-q-translate/           # QIR 导出工具
 python/flagtree_q/                    # Python 包和 CLI
   _C/                                # 项目自己的原生扩展
   language/                          # DSL 接口、类型与语义
   compiler/                          # AST 编译、源码诊断
-  runtime/                           # kernel 声明与编译入口
-  backends/                          # FlagQuantum 接入
-python/src/                          # C++ IR builder 绑定
+  runtime/                           # kernel 声明、编译与采样入口
+  backends/                          # 可选执行后端适配器
+python/src/                          # C++ IR builder 绑定与导出编排
 cmake/llvm-hash.txt                   # 已验证的 LLVM revision
 test/                                # lit/FileCheck 与 Python 测试
 docs/architecture.md
 ```
+
+`Dialect` 定义与优化内部 IR，`Conversion` 在 MLIR 内进行 lowering，`Target` 定义输出格式
+及其导出方式。`Conversion` 可以使用 `Target/QIR` 的 ABI 定义，`Target` 不依赖 `Conversion`。
+Python 绑定和 CLI 入口负责串联 lowering 与导出。执行后端在 Python 层消费导出的 QIR。
 
 ## Quanta dialect 设计
 
@@ -33,7 +40,7 @@ docs/architecture.md
 量子态，不返回新的 qubit。引用可以由 `quanta.alloc` 创建，也可以由调用方借给函数。
 
 类型由 TableGen 定义，支持 MLIR 文本与字节码往返。
-目前支持 IR 的解析、校验和打印，尚未接入执行后端。
+支持 IR 的解析、校验和打印；满足 QIR 导出限制的内核可通过 QIR Runner 执行。
 
 ### 量子门
 
@@ -81,8 +88,8 @@ quanta.swap %q0, %q1 : (!quanta.qubit, !quanta.qubit) -> ()
 工具注册了标准 `canonicalize` 和 `cse` pass；测试确认门的顺序、重复门与修饰符
 在这些 pass 后保留。更精细的量子资源、别名分析和门优化按后续需求引入。
 
-暂不支持负控制、寄存器、线性量子值和后端 lowering。
-多控制门在 IR 层可表达，目标后端的门分解仍待实现。
+暂不支持负控制、寄存器和线性量子值。
+多控制门在 IR 层可表达；QIR 导出支持其中的 CX、CCX、CZ，其他组合的门分解仍待实现。
 
 ### 分配、测量与生命周期
 
@@ -170,7 +177,8 @@ print(module)
   或对象属性访问；未知语法明确报错。内核需有可获取的 Python 源码，标量全局变量和闭包常量
   在每次编译时读取；错误保留文件、行列及原始源码，包括缩进和 UTF-8 字符。
 
-当前 `.compile()` 只生成 IR；直接调用 kernel 会报错，执行后端和 shots 接口尚未接入。
+`.compile()` 只生成 IR；`fq.sample(kernel, shots=1000)` 编译并执行采样。
+直接调用 kernel 会报错，不执行原始 Python 函数体。
 
 已实现 `python/src` 中的 pybind11 绑定，生成 `flagtree_q._C.libflagtree_q`。
 Python 直接通过它调用 MLIR C++ builder；不依赖 MLIR 官方 Python bindings。
@@ -201,3 +209,107 @@ cmake --build build --target check-flagtree-q -j4
 原生扩展默认输出到源码包的 `_C/`，二进制不纳入 Git；wheel 构建会输出到打包目录。
 `FLAGTREE_Q_BUILD_PYTHON_MODULE=OFF` 时仍可独立构建 C++ 工具和运行原有测试。
 当前本机 wheel 仍依赖 LLVM 引入的 Homebrew `libzstd`，尚未处理跨机器发布时的动态库打包。
+
+## QIR 导出
+
+第一版按 [QIR 2.0 Base Profile](https://github.com/qir-alliance/qir-spec/blob/main/specification/profiles/Base_Profile.md)
+实现（规范 `main`，核对日期 2026-10-14），使用 opaque `ptr`。Profile 和 QIS 是两项独立的
+后端要求；导出成功不代表任意 QIR 后端或 QIR → OpenQASM 转换器都能接受该程序。
+尚未接入外部执行后端，也未声明兼容 QIR 1.x。
+
+```text
+Python DSL → Quanta / arith / func
+           → 常量折叠、静态资源与 Profile 检查
+           → LLVM dialect + QIR calls
+           → LLVM IR (.ll) / bitcode (.bc)
+```
+
+- `Target/QIR/QIR.h` 和 `QIR.cpp` 集中定义函数名称、签名、入口属性、静态句柄与模块标志。
+  这些是本项目对规范的实现，不需要另建 QIR dialect 或引入 `third_party`。
+- `Conversion/QuantaToQIR` 提供 `--convert-quanta-to-qir`。先在副本上执行标准常量折叠，再
+  检查闭合的静态程序并构造 LLVM dialect。此阶段没有运行时经典计算；以后支持动态 Profile 时，
+  经典算术、函数和控制流可复用 MLIR 的标准 LLVM conversion passes。
+- `Target/QIR/Export.cpp` 接受已经 lowering 的 LLVM dialect module，执行 MLIR → LLVM IR
+  翻译、LLVM verifier 和输出，不运行 conversion passes，也不修改输入 IR。导出时检查输入阶段
+  与版本/资源标志；完整的 Profile/QIS 合法化仍由 lowering 阶段负责。
+  当前固定的 MLIR exporter 会将整数 module flags 扩为 i32，因此导出层将两个动态资源标志
+  恢复为 QIR 要求的 i1。直接用通用 `mlir-translate` 翻译 pass 输出会缺少这一步，应通过项目的
+  QIR 导出入口生成最终文件。
+- Python 的 `module.to_qir()` / `to_qir_bitcode()` 由 `python/src/ir.cpp` 在副本上组织
+  lowering 和最终导出；CLI 由 `tools/flagtree-q-translate` 组织相同步骤。两者显式依赖
+  conversion 与 target 库，编译流程不隐藏在 target 库中。
+
+支持范围：模块恰好包含一个无参数、单基本块内核；返回值为一次测量产生的 bit 或 void。
+角度必须能折叠为有限 f64 常量。支持 H、X、Y、Z、S、T、RX、RY、RZ、SWAP，以及 CX、CCX、CZ。
+S/T 的逆门调用 `__adj`，旋转逆门取负角度，其余支持的门为自伴随。
+QIS 名称采用 `h/x/y/z/s/t/rx/ry/rz/swap/cnot/ccx/cz/mz`，使用 `__quantum__qis__*__body`
+前缀/后缀；这是本项目选择的 QIS 子集，QIR 规范不强制后端提供这组门。
+
+所有酉门必须在所有测量之前，每个 qubit 最多测量一次。暂不支持 reset、运行时参数、借用
+qubit、测量结果计算、函数调用、动态控制流及其他受控门组合；无法折叠或不支持的程序明确报错。
+未被返回的测量仍会执行；只通过 `result_record_output` 输出返回的测量，void 输出空 tuple。
+标签为 `result` 或 `unit`，`output_labeling_schema="flagtree_q_v1"` 表示这套标签约定。
+
+局部分配按出现顺序映射为静态 qubit 编号，测量结果使用独立编号；两者均不复用。
+`__quantum__rt__initialize` 初始化全部 qubit 为零态。检查每个分配恰好释放一次后，
+`dealloc` 不生成动态释放调用：已释放 qubit 不再被使用，其子系统的丢弃可延迟到程序结束，
+保持其余 qubit 的测量统计。这也适用于释放纠缠态中的一个 qubit。
+LLVM 入口返回 `i64 0` 作为退出码，测量结果通过输出接口记录；不作为 LLVM 返回值。
+
+```python
+@fq.kernel
+def random_bit() -> bool:
+    q = ql.qubit()
+    ql.h(q)
+    return ql.measure(q)
+
+module = random_bit.compile()
+print(module.to_qir())          # str，LLVM IR
+bitcode = module.to_qir_bitcode()  # bytes，LLVM bitcode
+```
+
+这两个导出方法在副本上工作，保留原 Quanta module 和 Python 的 Function/Value 句柄。
+CLI 兼容直接输入 Quanta MLIR，也接受已经 lowering 的 LLVM dialect QIR。可分阶段执行：
+
+```sh
+build/bin/flagtree-q-opt --convert-quanta-to-qir kernel.mlir -o kernel.llvm.mlir
+build/bin/flagtree-q-translate --mlir-to-qir kernel.llvm.mlir -o kernel.ll
+build/bin/flagtree-q-translate --mlir-to-qir-bitcode kernel.llvm.mlir -o kernel.bc
+```
+
+将后两条命令的输入换成原始 `kernel.mlir`，CLI 会先执行 lowering，输出保持一致。
+
+## QIR Runner 执行后端
+
+QIR Runner 作为可选 Python 依赖，固定为已验证的 `qirrunner==0.9.6`。
+使用前在 `flagtree-q` 环境中安装 extra：
+
+```sh
+python -m pip install -e '.[qir-runner]'
+```
+
+LLVM/MLIR 构建配置与上面的 Python 扩展安装方式相同。QIR Runner 本体由 pip 管理，
+仓库中的 `python/flagtree_q/backends/qir_runner.py` 只实现执行适配，无需引入第三方源码。
+依赖延迟加载，单独使用 DSL、编译或导出 QIR 时不需要安装模拟器。
+
+```python
+counts = fq.sample(random_bit, shots=1000, backend="qir-runner", seed=42)
+print(counts)  # 例如 {"0": 508, "1": 492}
+```
+
+`runtime/sample.py` 校验参数并组织编译、QIR 导出与执行；适配器通过 `run_bytes()`
+传递 UTF-8 编码的 LLVM IR 文本，避免与 Runner 的 LLVM bitcode 版本绑定。
+不需要临时文件，也不将模拟器链接进本项目的 C++ 编译库。
+LLVM 23 起使用新的 `f0x` 浮点常量语法，适配器将 f64 常量转换为 Runner 的 LLVM 20
+可读取的 `0x` 写法，完整保留 64 位值；跳过字符串、符号名和注释。
+该转换仅用于执行，不修改原始 QIR 导出。
+
+每个 shot 从全零量子态开始。返回值为 `dict[str, int]`，只统计内核返回的测量 bit：
+`"0"` / `"1"` 为结果，字典值为次数；没有出现的结果不包含在字典中。
+void 内核返回 `{"": shots}`，表示没有返回测量位；不会自动测量或收集被丢弃的测量结果。
+所有执行都沿用上述 QIR 导出限制，暂不支持传入运行时参数或返回多个 bit。
+
+`shots` 是 1 到 `2**32 - 1` 的整数，`seed` 可省略，或为 0 到 `2**64 - 1` 的整数。
+固定后端版本和 seed 可复现采样结果。执行失败、输出格式不支持或 shot 数不完整时抛出异常，
+不返回部分计数。测试覆盖确定性门、受控门、逆门、随机采样、状态初始化和输出处理；
+未安装 extra 时仅跳过需要真实模拟器的测试。

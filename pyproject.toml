@@ -10,6 +10,9 @@ readme = "README.md"
 requires-python = ">=3.9"
 dependencies = []
 
+[project.optional-dependencies]
+qir-runner = ["qirrunner==0.9.6"]
+
 [project.scripts]
 flagtree-q = "flagtree_q.cli:main"
 

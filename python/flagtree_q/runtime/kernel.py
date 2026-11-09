@@ -17,7 +17,10 @@ class Kernel:
         return compile_kernel(self.function)
 
     def __call__(self, *args, **kwargs):
-        raise RuntimeError("kernel execution is not available; use .compile() to generate MLIR")
+        raise RuntimeError(
+            "direct kernel execution is not available; use fq.sample(kernel) "
+            "to sample or .compile() to generate MLIR"
+        )
 
 
 def kernel(function):

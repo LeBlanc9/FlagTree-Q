@@ -2,6 +2,7 @@
 // CHECK-DAG: arith
 // CHECK-DAG: builtin
 // CHECK-DAG: func
+// CHECK-DAG: llvm
 // CHECK-DAG: math
 // CHECK-DAG: quanta
 // CHECK-DAG: scf

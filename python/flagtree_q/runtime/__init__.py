@@ -1,5 +1,6 @@
-"""Kernel declarations; execution backends are not connected yet."""
+"""Kernel declarations and sampling entry points."""
 
 from .kernel import Kernel, kernel
+from .sample import sample
 
-__all__ = ["Kernel", "kernel"]
+__all__ = ["Kernel", "kernel", "sample"]
